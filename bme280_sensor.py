@@ -33,7 +33,7 @@ def configSectionMap(config, section):
 def parseTheArgs() -> object:
     parser = argparse.ArgumentParser(description='Reads a value from the BME280 sensor and writes it to MQTT and DB')
     parser.add_argument('-f', help='path and filename of the config file, default is ./config.rc',
-                        default='./config.rc')
+                        default='config.rc')
 
     args = parser.parse_args()
     return args
