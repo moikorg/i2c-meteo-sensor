@@ -1,3 +1,4 @@
+import time
 import sys
 import os
 import board
@@ -70,7 +71,8 @@ def getSensorData(sensor_bme280, mqtt_client, cursor):
     print(str(json_data))
 
     # write to MQTT
-    mqtt_client.publish("sensor/meteo/"+str(sensor_id), str(json_data))
+    ret_code = mqtt_client.publish("sensor/meteo/"+str(sensor_id), payload=str(json_data), qos=0, retain=False)
+    #print("MQTT return code: ", ret_code)
 
     # write to DB
     sql = "INSERT IGNORE INTO meteo_sensor (temperature, humidity, pressure, ts, ts_epoch, sensor_id) VALUES " \
@@ -85,6 +87,10 @@ def getSensorData(sensor_bme280, mqtt_client, cursor):
     print()
     return json_data
 
+def on_publish(client,userdata,result):             #create function for callback
+    print("data published ")
+    print("result data: ", result)
+    pass
 
 def main():
     args = parseTheArgs()
@@ -113,15 +119,19 @@ def main():
     # connect MQTT
     mqtt_client = mqtt.Client(conf_mqtt['client_name'])
     mqtt_client.username_pw_set(conf_mqtt['username'], conf_mqtt['password'])
+    mqtt_client.on_publish = on_publish
     mqtt_client.connect(conf_mqtt['host'])
 
     bme280_sensor = connectSensorBME280()
     getSensorData(bme280_sensor, mqtt_client, cursor_DB)
     mariadb_connection.commit()
     cursor_DB.close()
+    print("Disconnecting from DB")
     mariadb_connection.close()
 
+    print("Disconnecting from MQTT")
     mqtt_client.disconnect()
+    print("Bye")
 
 
 # this is the standard boilerplate that calls the main() function
