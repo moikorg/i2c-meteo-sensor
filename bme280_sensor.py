@@ -1,4 +1,5 @@
 import sys
+import os
 import board
 import busio
 import time
@@ -8,57 +9,34 @@ from datetime import datetime
 import json
 import paho.mqtt.client as mqtt
 import configparser
+import argparse
 
 
+# some constants
 sensor_id = 2
 temp_calibration = -0.4
 
-def main():
-    (conf_mqtt, conf_db) = getConfig()
-    if not conf_db:
-        print("ERROR: could not find the DB section in config file in the current directory: ", os.getcwd())
-        return 1
-    if not conf_mqtt:
-        print("ERROR: could not find the MQTT section in config file in the current directory: ", os.getcwd())
-        return 1
 
-    # connect DB
-    mariadb_connection = mariadb.connect(host=conf_db['host'], user=conf_db['username'], password=conf_db['password'],
-                                     database=conf_db['db'])
-    cursor_DB = mariadb_connection.cursor()
+def configSectionMap(config, section):
+    dict1 = {}
+    options = config.options(section)
+    for option in options:
+        try:
+            dict1[option] = config.get(section, option)
+            if dict1[option] == -1:
+                print("skip: %s" % option)
+        except:
+            print("exception on %s!" % option)
+            dict1[option] = None
+    return dict1
 
-    # connect MQTT
-    mqtt_client = mqtt.Client(conf_mqtt['client_name'])
-    mqtt_client.username_pw_set(conf_mqtt['username'], conf_mqtt['password'])
-    mqtt_client.connect(conf_mqtt['host'])
+def parseTheArgs() -> object:
+    parser = argparse.ArgumentParser(description='Reads a value from the BME280 sensor and writes it to MQTT and DB')
+    parser.add_argument('-f', help='path and filename of the config file, default is ./config.rc',
+                        default='./config.rc')
 
-    bme280_sensor = connectSensorBME280()
-    getSensorData(bme280_sensor, mqtt_client, cursor_DB)
-    mariadb_connection.commit()
-    cursor_DB.close()
-    mariadb_connection.close()
-
-
-
-def getConfig():
-    config = configparser.ConfigParser()
-    if not config.read('config.rc'):
-       return None
-
-    mqtt = {
-        'host':config['MQTT']['host'],
-        'username':config['MQTT']['username'],
-        'password': config['MQTT']['password'],
-        'client_name': config['MQTT']['client_name'],
-    }
-    db = {
-        'host':config['DB']['host'],
-        'password':config['DB']['password'],
-        'username': config['DB']['username'],
-        'db': config['DB']['db'],
-    }
-    return mqtt, db
-
+    args = parser.parse_args()
+    return args
 
 
 def connectSensorBME280():
@@ -107,6 +85,39 @@ def getSensorData(sensor_bme280, mqtt_client, cursor):
     print()
     return json_data
 
+
+def main():
+    args = parseTheArgs()
+    config = configparser.ConfigParser()
+    config.read(args.f)
+    try:
+        conf_mqtt = configSectionMap(config, "MQTT")
+    except:
+        print("Could not open config file, or could not find config section in file")
+        config_full_path = os.getcwd() + "/" + args.f
+        print("Tried to open the config file: ", config_full_path)
+    try:
+        conf_db = configSectionMap(config, "DB")
+    except:
+        print("Could not open config file, or could not find config section in file")
+        config_full_path = os.getcwd() + "/" + args.f
+        print("Tried to open the config file: ", config_full_path)
+
+    # connect DB
+    mariadb_connection = mariadb.connect(host=conf_db['host'], user=conf_db['username'], password=conf_db['password'],
+                                     database=conf_db['db'])
+    cursor_DB = mariadb_connection.cursor()
+
+    # connect MQTT
+    mqtt_client = mqtt.Client(conf_mqtt['client_name'])
+    mqtt_client.username_pw_set(conf_mqtt['username'], conf_mqtt['password'])
+    mqtt_client.connect(conf_mqtt['host'])
+
+    bme280_sensor = connectSensorBME280()
+    getSensorData(bme280_sensor, mqtt_client, cursor_DB)
+    mariadb_connection.commit()
+    cursor_DB.close()
+    mariadb_connection.close()
 
 
 
