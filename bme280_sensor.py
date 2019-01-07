@@ -121,6 +121,7 @@ def main():
     cursor_DB.close()
     mariadb_connection.close()
 
+    mqtt_client.disconnect()
 
 
 # this is the standard boilerplate that calls the main() function
