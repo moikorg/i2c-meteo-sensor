@@ -96,12 +96,14 @@ def main():
         print("Could not open config file, or could not find config section in file")
         config_full_path = os.getcwd() + "/" + args.f
         print("Tried to open the config file: ", config_full_path)
+        sys.exit(1)
     try:
         conf_db = configSectionMap(config, "DB")
     except:
         print("Could not open config file, or could not find config section in file")
         config_full_path = os.getcwd() + "/" + args.f
         print("Tried to open the config file: ", config_full_path)
+        sys.exit(1)
 
     # connect DB
     mariadb_connection = mariadb.connect(host=conf_db['host'], user=conf_db['username'], password=conf_db['password'],
