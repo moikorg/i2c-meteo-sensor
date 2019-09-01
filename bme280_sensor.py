@@ -15,7 +15,7 @@ import argparse
 
 # some constants
 sensor_id = 2
-temp_calibration = -0.4
+temp_calibration = -0.0
 
 
 def configSectionMap(config, section):
