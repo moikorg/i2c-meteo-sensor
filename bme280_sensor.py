@@ -80,7 +80,7 @@ def getSensorData(sensor_bme280, mqtt_client, cursor):
     cursor.execute(sql, val)
 
 
-    print("Temperature: %0.2f °C" % temp)
+    print("Temperature: %0.2f C" % temp)
     print("Humidity: %0.1f %%" % hum)
     print("Pressure: %0.1f hPa" % press)
 #    print("Altitude = %0.2f meters" % bme280.altitude)
