@@ -112,7 +112,7 @@ def main():
         sys.exit(1)
 
     # connect DB
-    mariadb_connection = mariadb.connect(host=conf_db['host'], user=conf_db['username'], password=conf_db['password'],
+    mariadb_connection = mariadb.connect(host=conf_db['host'], port=conf_db['port'], user=conf_db['username'], password=conf_db['password'],
                                      database=conf_db['db'])
     cursor_DB = mariadb_connection.cursor()
 
