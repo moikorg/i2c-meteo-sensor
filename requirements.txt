@@ -1,3 +1,4 @@
 adafruit-circuitpython-bme280
 paho-mqtt
 board
+mysql-connector-python

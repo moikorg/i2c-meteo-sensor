@@ -99,7 +99,7 @@ def main():
     try:
         conf_mqtt = configSectionMap(config, "MQTT")
     except:
-        print("Could not open config file, or could not find config section in file")
+        print("ERROR: Could not open config file, or could not find config section in file")
         config_full_path = os.getcwd() + "/" + args.f
         print("Tried to open the config file: ", config_full_path)
         sys.exit(1)
@@ -112,8 +112,12 @@ def main():
         sys.exit(1)
 
     # connect DB
-    mariadb_connection = mariadb.connect(host=conf_db['host'], port=conf_db['port'], user=conf_db['username'], password=conf_db['password'],
+    try:
+        mariadb_connection = mariadb.connect(host=conf_db['host'], port=conf_db['port'], user=conf_db['username'], password=conf_db['password'],
                                      database=conf_db['db'])
+    except:
+        print("ERROR: Could not connect to DB, exit")
+        sys.exit(-1)
     cursor_DB = mariadb_connection.cursor()
 
     # connect MQTT
