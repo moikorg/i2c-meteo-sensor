@@ -11,6 +11,10 @@ import json
 import paho.mqtt.client as mqtt
 import configparser
 import argparse
+import schedule
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS
+
 
 
 # some constants
@@ -31,10 +35,12 @@ def configSectionMap(config, section):
             dict1[option] = None
     return dict1
 
+
 def parseTheArgs() -> object:
     parser = argparse.ArgumentParser(description='Reads a value from the BME280 sensor and writes it to MQTT and DB')
     parser.add_argument('-f', help='path and filename of the config file, default is ./config.rc',
                         default='config.rc')
+    parser.add_argument('-d', help='write the data also to MariaDB/MySQL DB', action='store_true', dest='db_write')
 
     args = parser.parse_args()
     return args
@@ -50,7 +56,7 @@ def connectSensorBME280():
     return bme280
 
 
-def getSensorData(sensor_bme280, mqtt_client, cursor):
+def getSensorData(sensor_bme280, mqtt_client, db_write, cursor):
     epoch = int(time.time())
     dt = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -74,11 +80,11 @@ def getSensorData(sensor_bme280, mqtt_client, cursor):
     ret_code = mqtt_client.publish("sensor/meteo/"+str(sensor_id), payload=str(json_data), qos=0, retain=False)
     #print("MQTT return code: ", ret_code)
 
-    # write to DB
-    sql = "INSERT IGNORE INTO meteo_sensor (temperature, humidity, pressure, ts, ts_epoch, sensor_id) VALUES " \
-          "(%s, %s, %s, %s, %s, %s)"
-    cursor.execute(sql, val)
-
+    if db_write:
+        # write to DB
+        sql = "INSERT IGNORE INTO meteo_sensor (temperature, humidity, pressure, ts, ts_epoch, sensor_id) VALUES " \
+            "(%s, %s, %s, %s, %s, %s)"
+        cursor.execute(sql, val)
 
     print("Temperature: %0.2f C" % temp)
     print("Humidity: %0.1f %%" % hum)
@@ -87,15 +93,31 @@ def getSensorData(sensor_bme280, mqtt_client, cursor):
     print()
     return json_data
 
+
 def on_publish(client,userdata,result):             #create function for callback
     print("data published ")
     print("result data: ", result)
     pass
 
+
 def main():
     args = parseTheArgs()
     config = configparser.ConfigParser()
     config.read(args.f)
+
+    try:
+        periodicity = int(configSectionMap(config, "Sensor")['periodicity'])
+    except:
+        sys.exit("Periodicity value must be int")
+
+    schedule.every(periodicity).seconds.do(job, config=config)
+    while True:
+        schedule.run_pending()
+        time.sleep(5)
+
+
+
+def job(config):
     try:
         conf_mqtt = configSectionMap(config, "MQTT")
     except:
@@ -103,35 +125,40 @@ def main():
         config_full_path = os.getcwd() + "/" + args.f
         print("Tried to open the config file: ", config_full_path)
         sys.exit(1)
-    try:
-        conf_db = configSectionMap(config, "DB")
-    except:
-        print("Could not open config file, or could not find config section in file")
-        config_full_path = os.getcwd() + "/" + args.f
-        print("Tried to open the config file: ", config_full_path)
-        sys.exit(1)
 
-    # connect DB
-    try:
-        mariadb_connection = mariadb.connect(host=conf_db['host'], port=conf_db['port'], user=conf_db['username'], password=conf_db['password'],
-                                     database=conf_db['db'])
-    except:
-        print("ERROR: Could not connect to DB, exit")
-        sys.exit(-1)
-    cursor_DB = mariadb_connection.cursor()
+    cursor_DB = None
+    if args.db_write:
+        try:
+            conf_db = configSectionMap(config, "DB")
+        except:
+            print("Could not open config file, or could not find config section in file")
+            config_full_path = os.getcwd() + "/" + args.f
+            print("Tried to open the config file: ", config_full_path)
+            sys.exit(1)
+        # connect DB
+        try:
+            mariadb_connection = mariadb.connect(host=conf_db['host'], port=conf_db['port'], user=conf_db['username'], password=conf_db['password'],
+                                        database=conf_db['db'])
+        except:
+            print("ERROR: Could not connect to DB, exit")
+            sys.exit(-1)
+        cursor_DB = mariadb_connection.cursor()
 
     # connect MQTT
     mqtt_client = mqtt.Client(conf_mqtt['client_name'])
     mqtt_client.username_pw_set(conf_mqtt['username'], conf_mqtt['password'])
     mqtt_client.on_publish = on_publish
-    mqtt_client.connect(conf_mqtt['host'])
-
+    try:
+        mqtt_client.connect(conf_mqtt['host'])
+    except:
+        print("Can not connect to MQTT broker, exiting")
+        #exit(-1)
     bme280_sensor = connectSensorBME280()
-    getSensorData(bme280_sensor, mqtt_client, cursor_DB)
-    mariadb_connection.commit()
-    cursor_DB.close()
-    print("Disconnecting from DB")
-    mariadb_connection.close()
+    getSensorData(bme280_sensor, mqtt_client, args.db_write, cursor_DB)
+    if args.db_write:
+        mariadb_connection.commit()
+        cursor_DB.close()
+        mariadb_connection.close()
 
     print("Disconnecting from MQTT")
     mqtt_client.disconnect()
