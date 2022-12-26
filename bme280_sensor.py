@@ -19,7 +19,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 
 # some constants
 sensor_id = 2
-temp_calibration = -0.0
+temp_calibration = -0.5
 
 
 def configSectionMap(config, section):
