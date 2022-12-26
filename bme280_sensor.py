@@ -110,14 +110,14 @@ def main():
     except:
         sys.exit("Periodicity value must be int")
 
-    schedule.every(periodicity).seconds.do(job, config=config)
+    schedule.every(periodicity).seconds.do(job, config=config, args=args)
     while True:
         schedule.run_pending()
         time.sleep(5)
 
 
 
-def job(config):
+def job(config, args):
     try:
         conf_mqtt = configSectionMap(config, "MQTT")
     except:
