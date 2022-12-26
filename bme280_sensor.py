@@ -110,28 +110,27 @@ def main():
     except:
         sys.exit("Periodicity value must be int")
 
-    schedule.every(periodicity).seconds.do(job, config=config, args=args)
+    try:
+        conf_mqtt = configSectionMap(config, "MQTT")
+    except:
+        print("ERROR (mqtt): Could not open config file, or could not find config section in file")
+        config_full_path = os.getcwd() + "/" + args.f
+        print("Tried to open the config file: ", config_full_path)
+        sys.exit(1)
+    schedule.every(periodicity).seconds.do(job, conf_mqtt=conf_mqtt, args=args)
     while True:
         schedule.run_pending()
         time.sleep(5)
 
 
 
-def job(config, args):
-    try:
-        conf_mqtt = configSectionMap(config, "MQTT")
-    except:
-        print("ERROR: Could not open config file, or could not find config section in file")
-        config_full_path = os.getcwd() + "/" + args.f
-        print("Tried to open the config file: ", config_full_path)
-        sys.exit(1)
-
+def job(conf_mqtt, args):
     cursor_DB = None
     if args.db_write:
         try:
             conf_db = configSectionMap(config, "DB")
         except:
-            print("Could not open config file, or could not find config section in file")
+            print("ERROR (db):Could not open config file, or could not find config section in file")
             config_full_path = os.getcwd() + "/" + args.f
             print("Tried to open the config file: ", config_full_path)
             sys.exit(1)
