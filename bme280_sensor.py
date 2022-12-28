@@ -4,7 +4,7 @@ import os
 import board
 import busio
 import time
-import adafruit_bme280
+from adafruit_bme280 import basic as adafruit_bme280
 import mysql.connector as mariadb
 from datetime import datetime
 import json
