@@ -100,6 +100,20 @@ def on_publish(client,userdata,result):             #create function for callbac
     pass
 
 
+def write2InfluxDB(conf, values):
+    with InfluxDBClient(conf['url'], token=conf['token'], org=conf['org']) as client:
+        write_api = client.write_api(write_options=SYNCHRONOUS)
+
+        aDict = json.loads(values)
+        p = Point(conf['measurement'])\
+            .tag("location", conf['location'])\
+            .field("temperature", aDict['temp'])\
+            .field("humidity", aDict['hum'])\
+            .field("pressure", aDict['press'])
+        write_api.write(bucket=conf['bucket'], org=conf['org'], record=p)
+        print("wrote to InfluxDB")
+        #.time(aDict['ts'])
+
 def main():
     args = parseTheArgs()
     config = configparser.ConfigParser()
@@ -112,19 +126,20 @@ def main():
 
     try:
         conf_mqtt = configSectionMap(config, "MQTT")
+        conf_influx = configSectionMap(config, "InfluxDB")
     except:
         print("ERROR (mqtt): Could not open config file, or could not find config section in file")
         config_full_path = os.getcwd() + "/" + args.f
         print("Tried to open the config file: ", config_full_path)
         sys.exit(1)
-    schedule.every(periodicity).seconds.do(job, conf_mqtt=conf_mqtt, args=args)
+    schedule.every(periodicity).seconds.do(job, conf_mqtt=conf_mqtt, conf_influx=conf_influx, args=args)
     while True:
         schedule.run_pending()
         time.sleep(5)
 
 
 
-def job(conf_mqtt, args):
+def job(conf_mqtt, conf_influx, args):
     cursor_DB = None
     if args.db_write:
         try:
@@ -153,7 +168,8 @@ def job(conf_mqtt, args):
         print("Can not connect to MQTT broker, exiting")
         #exit(-1)
     bme280_sensor = connectSensorBME280()
-    getSensorData(bme280_sensor, mqtt_client, args.db_write, cursor_DB)
+    ret_value=getSensorData(bme280_sensor, mqtt_client, args.db_write, cursor_DB)
+    write2InfluxDB(conf_influx, ret_value)
     if args.db_write:
         mariadb_connection.commit()
         cursor_DB.close()
