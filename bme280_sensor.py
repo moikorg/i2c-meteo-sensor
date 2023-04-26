@@ -107,11 +107,14 @@ def write2InfluxDB(conf, values):
         aDict = json.loads(values)
         p = Point(conf['measurement'])\
             .tag("location", conf['location'])\
-            .field("temperature", aDict['temp'])\
-            .field("humidity", aDict['hum'])\
-            .field("pressure", aDict['press'])
-        write_api.write(bucket=conf['bucket'], org=conf['org'], record=p)
-        print("wrote to InfluxDB")
+            .field("temperature", float(aDict['temp']))\
+            .field("humidity", float(aDict['hum']))\
+            .field("pressure", float(aDict['press']))
+        try:
+            write_api.write(bucket=conf['bucket'], org=conf['org'], record=p)
+            print("wrote to InfluxDB")
+        except:
+            print("ERROR: Could not write to InfluxDB, retry next time")
         #.time(aDict['ts'])
 
 def main():
